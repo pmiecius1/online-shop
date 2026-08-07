@@ -15,7 +15,34 @@ async function markOrderPaid(
   })
 
   const order = existing.docs[0]
-  if (!order) return
+  const paymentIntentId =
+    typeof session.payment_intent === 'string' ? session.payment_intent : undefined
+  const customerEmail = session.customer_details?.email ?? undefined
+
+  if (!order) {
+    // No matching order — most likely /api/checkout's payload.create failed after the
+    // Stripe session was already made (e.g. a DB hiccup). Since this webhook event is
+    // itself the verified proof of payment, reconstruct the order from the session's
+    // own metadata/amount rather than silently losing a paid order.
+    const productId = Number(session.metadata?.productId)
+    if (!productId || Number.isNaN(productId)) return
+
+    await payload.create({
+      collection: 'orders',
+      data: {
+        product: productId,
+        status: 'paid',
+        amount: (session.amount_total ?? 0) / 100,
+        currency: session.currency ?? 'eur',
+        stripeCheckoutSessionId: session.id,
+        stripePaymentIntentId: paymentIntentId,
+        customerEmail,
+      },
+      overrideAccess: true,
+    })
+    return
+  }
+
   // Idempotent: webhook retries or duplicate events must not re-process a settled order
   if (order.status === 'paid') return
 
@@ -24,9 +51,8 @@ async function markOrderPaid(
     id: order.id,
     data: {
       status: 'paid',
-      stripePaymentIntentId:
-        typeof session.payment_intent === 'string' ? session.payment_intent : undefined,
-      customerEmail: session.customer_details?.email ?? undefined,
+      stripePaymentIntentId: paymentIntentId,
+      customerEmail,
     },
     overrideAccess: true,
   })
