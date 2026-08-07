@@ -7,10 +7,11 @@ on:
   pull_request:
     types: [closed]
     branches: [main]
+  workflow_dispatch: {}
 
 jobs:
   deploy-preview:
-    if: github.event.pull_request.merged == true
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     environment: preview
     env:
@@ -22,11 +23,15 @@ jobs:
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
 
-      - name: Pull Vercel environment info
-        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Build project artifacts
-        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
-
       - name: Deploy preview to Vercel
-        run: vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
+        # Plain `vercel deploy` (no --prebuilt) uploads the source and lets
+        # Vercel build it on its own infrastructure. This matters because
+        # our env vars are stored as "Sensitive" (write-only) — they only
+        # decrypt during a build that Vercel itself runs, not a local
+        # `vercel build` on the Actions runner.
+        #
+        # --target=preview is required and NOT optional here: with Vercel's
+        # Git integration disconnected, `vercel deploy` has no branch context
+        # to infer preview-vs-production from, and silently defaults to
+        # production without this flag.
+        run: vercel deploy --target=preview --token=${{ secrets.VERCEL_TOKEN }}
