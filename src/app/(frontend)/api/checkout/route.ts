@@ -22,6 +22,7 @@ export async function POST(request: Request): Promise<Response> {
     collection: 'products',
     id: productId,
     overrideAccess: false,
+    disableErrors: true,
   })
 
   if (!product) {
