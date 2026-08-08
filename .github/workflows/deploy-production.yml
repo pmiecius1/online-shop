@@ -1,0 +1,32 @@
+name: Deploy Production
+
+# Fires when a pull request into the production branch is merged. Vercel's
+# own Git integration is disconnected (see `vercel git disconnect`), so this
+# is the only thing that deploys to production.
+on:
+  pull_request:
+    types: [closed]
+    branches: [production]
+  workflow_dispatch: {}
+
+jobs:
+  deploy-production:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Deploy to production
+        # Plain `vercel deploy --prod` (no --prebuilt) uploads the source and
+        # lets Vercel build it on its own infrastructure. This matters
+        # because our env vars are stored as "Sensitive" (write-only) — they
+        # only decrypt during a build that Vercel itself runs, not a local
+        # `vercel build` on the Actions runner.
+        run: vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }}
