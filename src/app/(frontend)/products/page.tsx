@@ -1,6 +1,6 @@
 import type { Metadata } from 'next/types'
 
-import { BuyButton } from '@/components/BuyButton'
+import { BookingWidget } from '@/components/BookingWidget'
 import { Media } from '@/components/Media'
 import configPromise from '@payload-config'
 import { getPayload } from 'payload'
@@ -36,9 +36,11 @@ export default async function Page() {
               </div>
               <div className="p-4">
                 <h2 className="text-lg font-semibold">{product.name}</h2>
-                <p className="text-base font-medium">€{product.price.toFixed(2)}</p>
+                <p className="text-base font-medium">
+                  €{product.price.toFixed(2)} · {product.duration} min
+                </p>
                 <p className="text-sm text-muted-foreground mt-2">{product.description}</p>
-                <BuyButton productId={product.id} />
+                <BookingWidget productId={product.id} />
               </div>
             </div>
           ))}

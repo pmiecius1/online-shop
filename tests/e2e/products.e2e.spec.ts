@@ -45,6 +45,7 @@ test.describe('Products (admin)', () => {
     await page.goto('http://localhost:3001/admin/collections/products/create')
 
     await page.fill('#field-name', 'E2E Test Product')
+    await page.fill('#field-duration', '30')
     await page.fill('#field-price', '12.5')
     await page.fill('#field-description', 'Created by the products e2e test.')
 
