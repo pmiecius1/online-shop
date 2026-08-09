@@ -11,10 +11,12 @@ const testImagePath = path.resolve(dirname, '../fixtures/test-product.png')
 let payload: Payload
 let mediaId: number
 let productId: number
+let slotId: number
 let orderId: number
 
 const orderData = () => ({
   product: productId,
+  slot: slotId,
   status: 'pending' as const,
   amount: 19.99,
   currency: 'eur',
@@ -37,6 +39,7 @@ describe('Orders API', () => {
       collection: 'products',
       data: {
         name: 'Order Test Product',
+        duration: 30,
         price: 19.99,
         description: 'Product used to test Orders access control.',
         photo: mediaId,
@@ -44,6 +47,18 @@ describe('Orders API', () => {
       overrideAccess: true,
     })
     productId = product.id
+
+    const slot = await payload.create({
+      collection: 'slots',
+      data: {
+        product: productId,
+        startsAt: new Date(Date.now() + 86400000).toISOString(),
+        capacity: 1,
+        bookedCount: 0,
+      },
+      overrideAccess: true,
+    })
+    slotId = slot.id
 
     const order = await payload.create({
       collection: 'orders',
@@ -55,6 +70,7 @@ describe('Orders API', () => {
 
   afterAll(async () => {
     await payload.delete({ collection: 'orders', id: orderId, overrideAccess: true })
+    await payload.delete({ collection: 'slots', id: slotId, overrideAccess: true })
     await payload.delete({ collection: 'products', id: productId, overrideAccess: true })
     await payload.delete({ collection: 'media', id: mediaId, overrideAccess: true })
   })

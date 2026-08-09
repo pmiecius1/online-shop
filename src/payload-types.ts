@@ -72,6 +72,7 @@ export interface Config {
     media: Media;
     categories: Category;
     products: Product;
+    slots: Slot;
     orders: Order;
     users: User;
     redirects: Redirect;
@@ -96,6 +97,7 @@ export interface Config {
     media: MediaSelect<false> | MediaSelect<true>;
     categories: CategoriesSelect<false> | CategoriesSelect<true>;
     products: ProductsSelect<false> | ProductsSelect<true>;
+    slots: SlotsSelect<false> | SlotsSelect<true>;
     orders: OrdersSelect<false> | OrdersSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     redirects: RedirectsSelect<false> | RedirectsSelect<true>;
@@ -784,11 +786,33 @@ export interface Product {
   id: number;
   name: string;
   /**
+   * Session length in minutes
+   */
+  duration: number;
+  /**
    * Price in EUR (€)
    */
   price: number;
   description: string;
   photo: number | Media;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Bookable date/time slots for a product. bookedCount is managed automatically by checkout — a slot is held as soon as checkout starts and released again if payment fails or the session expires.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "slots".
+ */
+export interface Slot {
+  id: number;
+  product: number | Product;
+  startsAt: string;
+  capacity: number;
+  /**
+   * Managed automatically by checkout. Do not edit directly.
+   */
+  bookedCount: number;
   updatedAt: string;
   createdAt: string;
 }
@@ -801,6 +825,7 @@ export interface Product {
 export interface Order {
   id: number;
   product: number | Product;
+  slot: number | Slot;
   status: 'pending' | 'paid' | 'failed' | 'canceled';
   /**
    * Price charged, in the major currency unit (e.g. euros), at time of order.
@@ -1022,6 +1047,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'products';
         value: number | Product;
+      } | null)
+    | ({
+        relationTo: 'slots';
+        value: number | Slot;
       } | null)
     | ({
         relationTo: 'orders';
@@ -1379,9 +1408,22 @@ export interface CategoriesSelect<T extends boolean = true> {
  */
 export interface ProductsSelect<T extends boolean = true> {
   name?: T;
+  duration?: T;
   price?: T;
   description?: T;
   photo?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "slots_select".
+ */
+export interface SlotsSelect<T extends boolean = true> {
+  product?: T;
+  startsAt?: T;
+  capacity?: T;
+  bookedCount?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1391,6 +1433,7 @@ export interface ProductsSelect<T extends boolean = true> {
  */
 export interface OrdersSelect<T extends boolean = true> {
   product?: T;
+  slot?: T;
   status?: T;
   amount?: T;
   currency?: T;

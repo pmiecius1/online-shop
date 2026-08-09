@@ -13,13 +13,22 @@ export const Products: CollectionConfig = {
   },
   admin: {
     useAsTitle: 'name',
-    defaultColumns: ['name', 'price', 'photo'],
+    defaultColumns: ['name', 'duration', 'price', 'photo'],
   },
   fields: [
     {
       name: 'name',
       type: 'text',
       required: true,
+    },
+    {
+      name: 'duration',
+      type: 'number',
+      required: true,
+      min: 1,
+      admin: {
+        description: 'Session length in minutes',
+      },
     },
     {
       name: 'price',
