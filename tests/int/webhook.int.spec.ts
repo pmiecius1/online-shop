@@ -65,6 +65,19 @@ async function orderForSession(sessionId: string) {
   return result.docs[0]
 }
 
+async function createSlot(capacity = 1, bookedCount = 1) {
+  return payload.create({
+    collection: 'slots',
+    data: {
+      product: productId,
+      startsAt: new Date(Date.now() + 86400000).toISOString(),
+      capacity,
+      bookedCount,
+    },
+    overrideAccess: true,
+  })
+}
+
 describe('Stripe webhook', () => {
   beforeAll(async () => {
     const payloadConfig = await config
@@ -83,6 +96,7 @@ describe('Stripe webhook', () => {
       collection: 'products',
       data: {
         name: 'Webhook Test Product',
+        duration: 30,
         price: 19.99,
         description: 'Product used to test the Stripe webhook.',
         photo: mediaId,
@@ -96,6 +110,11 @@ describe('Stripe webhook', () => {
     await payload.delete({
       collection: 'orders',
       where: { stripeCheckoutSessionId: { like: 'cs_test_webhook_%' } },
+      overrideAccess: true,
+    })
+    await payload.delete({
+      collection: 'slots',
+      where: { product: { equals: productId } },
       overrideAccess: true,
     })
     await payload.delete({ collection: 'products', id: productId, overrideAccess: true })
@@ -122,10 +141,12 @@ describe('Stripe webhook', () => {
 
   it('marks a pending order paid on a validly signed checkout.session.completed event', async () => {
     const sessionId = 'cs_test_webhook_pending_to_paid'
+    const slot = await createSlot()
     const order = await payload.create({
       collection: 'orders',
       data: {
         product: productId,
+        slot: slot.id,
         status: 'pending',
         amount: 19.99,
         currency: 'eur',
@@ -146,14 +167,24 @@ describe('Stripe webhook', () => {
     expect(updated.status).toBe('paid')
     expect(updated.stripePaymentIntentId).toBe('pi_test_123')
     expect(updated.customerEmail).toBe('buyer@example.com')
+
+    // Paid orders keep the slot reservation — bookedCount is untouched
+    const unchangedSlot = await payload.findByID({
+      collection: 'slots',
+      id: slot.id,
+      overrideAccess: true,
+    })
+    expect(unchangedSlot.bookedCount).toBe(1)
   })
 
   it('is idempotent: replaying the same event does not error and stays paid', async () => {
     const sessionId = 'cs_test_webhook_idempotent'
+    const slot = await createSlot()
     await payload.create({
       collection: 'orders',
       data: {
         product: productId,
+        slot: slot.id,
         status: 'pending',
         amount: 19.99,
         currency: 'eur',
@@ -175,10 +206,11 @@ describe('Stripe webhook', () => {
 
   it('self-heals: creates a paid order from session metadata if no matching order exists', async () => {
     const sessionId = 'cs_test_webhook_no_matching_order'
+    const slot = await createSlot()
     const req = signedRequest(
       checkoutSessionCompletedEvent({
         id: sessionId,
-        metadata: { productId: String(productId) },
+        metadata: { productId: String(productId), slotId: String(slot.id) },
         amount_total: 1999,
       }),
     )
@@ -189,14 +221,18 @@ describe('Stripe webhook', () => {
     expect(order).toBeDefined()
     expect(order?.status).toBe('paid')
     expect(order?.amount).toBe(19.99)
+    const orderSlot = typeof order?.slot === 'object' ? order.slot.id : order?.slot
+    expect(orderSlot).toBe(slot.id)
   })
 
   it('does not mark an order paid when payment_status is not "paid"', async () => {
     const sessionId = 'cs_test_webhook_unpaid'
+    const slot = await createSlot()
     const order = await payload.create({
       collection: 'orders',
       data: {
         product: productId,
+        slot: slot.id,
         status: 'pending',
         amount: 19.99,
         currency: 'eur',
@@ -217,5 +253,115 @@ describe('Stripe webhook', () => {
       overrideAccess: true,
     })
     expect(unchanged.status).toBe('pending')
+  })
+
+  it('releases the slot hold when a checkout session expires', async () => {
+    const sessionId = 'cs_test_webhook_expired'
+    const slot = await createSlot(1, 1)
+    const order = await payload.create({
+      collection: 'orders',
+      data: {
+        product: productId,
+        slot: slot.id,
+        status: 'pending',
+        amount: 19.99,
+        currency: 'eur',
+        stripeCheckoutSessionId: sessionId,
+      },
+      overrideAccess: true,
+    })
+
+    const req = signedRequest({
+      id: 'evt_test_expired',
+      object: 'event',
+      type: 'checkout.session.expired',
+      data: { object: { id: sessionId, object: 'checkout.session' } },
+    })
+    const res = await POST(req)
+    expect(res.status).toBe(200)
+
+    const updatedOrder = await payload.findByID({
+      collection: 'orders',
+      id: order.id,
+      overrideAccess: true,
+    })
+    expect(updatedOrder.status).toBe('canceled')
+
+    const releasedSlot = await payload.findByID({
+      collection: 'slots',
+      id: slot.id,
+      overrideAccess: true,
+    })
+    expect(releasedSlot.bookedCount).toBe(0)
+  })
+
+  it('releases the slot hold when async payment fails', async () => {
+    const sessionId = 'cs_test_webhook_async_failed'
+    const slot = await createSlot(1, 1)
+    await payload.create({
+      collection: 'orders',
+      data: {
+        product: productId,
+        slot: slot.id,
+        status: 'pending',
+        amount: 19.99,
+        currency: 'eur',
+        stripeCheckoutSessionId: sessionId,
+      },
+      overrideAccess: true,
+    })
+
+    const req = signedRequest({
+      id: 'evt_test_async_failed',
+      object: 'event',
+      type: 'checkout.session.async_payment_failed',
+      data: { object: { id: sessionId, object: 'checkout.session' } },
+    })
+    const res = await POST(req)
+    expect(res.status).toBe(200)
+
+    const order = await orderForSession(sessionId)
+    expect(order?.status).toBe('failed')
+
+    const releasedSlot = await payload.findByID({
+      collection: 'slots',
+      id: slot.id,
+      overrideAccess: true,
+    })
+    expect(releasedSlot.bookedCount).toBe(0)
+  })
+
+  it('does not double-release a slot when the expiry event is replayed', async () => {
+    const sessionId = 'cs_test_webhook_expired_idempotent'
+    const slot = await createSlot(1, 1)
+    await payload.create({
+      collection: 'orders',
+      data: {
+        product: productId,
+        slot: slot.id,
+        status: 'pending',
+        amount: 19.99,
+        currency: 'eur',
+        stripeCheckoutSessionId: sessionId,
+      },
+      overrideAccess: true,
+    })
+
+    const event = {
+      id: 'evt_test_expired_replay',
+      object: 'event',
+      type: 'checkout.session.expired',
+      data: { object: { id: sessionId, object: 'checkout.session' } },
+    }
+    await POST(signedRequest(event))
+    await POST(signedRequest(event))
+
+    const releasedSlot = await payload.findByID({
+      collection: 'slots',
+      id: slot.id,
+      overrideAccess: true,
+    })
+    // Would be -1 if the release ran twice — idempotency guard must prevent that
+    expect(releasedSlot.bookedCount).toBe(0)
   })
 })

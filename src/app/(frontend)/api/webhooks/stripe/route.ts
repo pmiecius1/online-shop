@@ -23,14 +23,18 @@ async function markOrderPaid(
     // No matching order — most likely /api/checkout's payload.create failed after the
     // Stripe session was already made (e.g. a DB hiccup). Since this webhook event is
     // itself the verified proof of payment, reconstruct the order from the session's
-    // own metadata/amount rather than silently losing a paid order.
+    // own metadata/amount rather than silently losing a paid order. The slot was
+    // already reserved by /api/checkout before the session was created, so no
+    // additional booked-count change is needed here.
     const productId = Number(session.metadata?.productId)
-    if (!productId || Number.isNaN(productId)) return
+    const slotId = Number(session.metadata?.slotId)
+    if (!productId || Number.isNaN(productId) || !slotId || Number.isNaN(slotId)) return
 
     await payload.create({
       collection: 'orders',
       data: {
         product: productId,
+        slot: slotId,
         status: 'paid',
         amount: (session.amount_total ?? 0) / 100,
         currency: session.currency ?? 'eur',
@@ -71,7 +75,8 @@ async function markOrderFailed(
   })
 
   const order = existing.docs[0]
-  if (!order || order.status === 'paid') return
+  // Idempotent: skip if already settled (paid) or already released (failed/canceled)
+  if (!order || order.status === 'paid' || order.status === status) return
 
   await payload.update({
     collection: 'orders',
@@ -79,6 +84,13 @@ async function markOrderFailed(
     data: { status },
     overrideAccess: true,
   })
+
+  // Release the slot hold that /api/checkout placed at checkout-session-creation time.
+  const slotId = typeof order.slot === 'object' ? order.slot.id : order.slot
+  await payload.db.pool.query(
+    `UPDATE slots SET booked_count = booked_count - 1 WHERE id = $1 AND booked_count > 0`,
+    [slotId],
+  )
 }
 
 export async function POST(request: Request): Promise<Response> {

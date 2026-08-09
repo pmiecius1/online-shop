@@ -14,6 +14,7 @@ let productId: number
 
 const productData = {
   name: 'Test Product',
+  duration: 30,
   price: 19.99,
   description: 'A short description of the test product.',
 }
@@ -122,7 +123,7 @@ describe('Products API', () => {
     })
   })
 
-  it('requires name, price, description, and photo', async () => {
+  it('requires name, duration, price, description, and photo', async () => {
     await expect(
       payload.create({
         collection: 'products',

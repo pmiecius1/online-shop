@@ -28,6 +28,12 @@ export const Orders: CollectionConfig = {
       required: true,
     },
     {
+      name: 'slot',
+      type: 'relationship',
+      relationTo: 'slots',
+      required: true,
+    },
+    {
       name: 'status',
       type: 'select',
       required: true,
