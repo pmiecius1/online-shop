@@ -24,6 +24,9 @@ export async function Footer() {
             {navItems.map(({ link }, i) => {
               return <CMSLink className="text-white" key={i} {...link} />
             })}
+            <Link className="text-white" href="/privacy">
+              Privacy Policy
+            </Link>
           </nav>
         </div>
       </div>
