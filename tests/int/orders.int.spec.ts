@@ -45,6 +45,7 @@ describe('Orders API', () => {
         photo: mediaId,
       },
       overrideAccess: true,
+      context: { disableRevalidate: true },
     })
     productId = product.id
 
@@ -71,7 +72,12 @@ describe('Orders API', () => {
   afterAll(async () => {
     await payload.delete({ collection: 'orders', id: orderId, overrideAccess: true })
     await payload.delete({ collection: 'slots', id: slotId, overrideAccess: true })
-    await payload.delete({ collection: 'products', id: productId, overrideAccess: true })
+    await payload.delete({
+      collection: 'products',
+      id: productId,
+      overrideAccess: true,
+      context: { disableRevalidate: true },
+    })
     await payload.delete({ collection: 'media', id: mediaId, overrideAccess: true })
   })
 

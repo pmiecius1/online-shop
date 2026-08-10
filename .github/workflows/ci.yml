@@ -1,0 +1,54 @@
+name: CI
+
+# Runs lint and the integration test suite (checkout, webhook idempotency,
+# slot-reservation races) on every pull request into main, so a regression
+# has a chance to be caught before deploy-preview.yml/deploy-production.yml
+# ship it. Requires DATABASE_URI/PAYLOAD_SECRET/STRIPE_SECRET_KEY etc. to be
+# configured as repo secrets — see README "Testing" section.
+on:
+  pull_request:
+    branches: [main, production]
+  workflow_dispatch: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URI: ${{ secrets.DATABASE_URI }}
+      PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
+      NEXT_PUBLIC_SERVER_URL: http://localhost:3000
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      PREVIEW_SECRET: ${{ secrets.PREVIEW_SECRET }}
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+      STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+      BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        # Non-blocking for now: fixing the ESLint config (see eslint.config.mjs)
+        # made lint actually run for the first time in a while, and it surfaced
+        # 6 pre-existing react-hooks errors unrelated to this change (refs
+        # accessed during render / setState called synchronously in effects,
+        # in BookingWidget, Card, ThemeSelector, Theme). Once those are
+        # triaged and fixed, drop `continue-on-error` so lint blocks like
+        # the integration tests do.
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Integration tests
+        # --no-file-parallelism: each test file opens its own Payload/DB
+        # connection pool against the transaction pooler; running all 5
+        # files' setup concurrently exhausts it and every beforeAll hook
+        # times out. Confirmed locally: passes reliably serialized, fails
+        # intermittently in parallel.
+        run: npm run test:int -- --no-file-parallelism

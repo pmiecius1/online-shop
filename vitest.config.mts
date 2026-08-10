@@ -5,8 +5,19 @@ import tsconfigPaths from 'vite-tsconfig-paths'
 export default defineConfig({
   plugins: [tsconfigPaths(), react()],
   test: {
-    environment: 'jsdom',
+    // These are server-side Payload API integration tests, not component
+    // tests — no DOM is involved. jsdom was left over from copying this
+    // config elsewhere, and its polyfills make the `file-type` package
+    // (used by Payload's upload MIME-type validation) misdetect file
+    // buffers, breaking any test that uploads media once a collection
+    // restricts `mimeTypes`.
+    environment: 'node',
     setupFiles: ['./vitest.setup.ts'],
     include: ['tests/int/**/*.int.spec.ts'],
+    // Payload's beforeAll does a full schema pull from Postgres. Locally
+    // (same region as the DB) that's ~5s; from a GitHub Actions runner
+    // (US) against a Supabase project in eu-north-1, cross-region latency
+    // pushes it past the 10s default and every beforeAll hook times out.
+    hookTimeout: 30000,
   },
 })

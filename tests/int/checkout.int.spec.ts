@@ -44,6 +44,7 @@ describe('Checkout API', () => {
         photo: mediaId,
       },
       overrideAccess: true,
+      context: { disableRevalidate: true },
     })
     productId = product.id
   })
@@ -59,7 +60,12 @@ describe('Checkout API', () => {
       where: { product: { equals: productId } },
       overrideAccess: true,
     })
-    await payload.delete({ collection: 'products', id: productId, overrideAccess: true })
+    await payload.delete({
+      collection: 'products',
+      id: productId,
+      overrideAccess: true,
+      context: { disableRevalidate: true },
+    })
     await payload.delete({ collection: 'media', id: mediaId, overrideAccess: true })
   })
 
@@ -131,6 +137,7 @@ describe('Checkout API', () => {
         photo: mediaId,
       },
       overrideAccess: true,
+      context: { disableRevalidate: true },
     })
     const slot = await payload.create({
       collection: 'slots',
@@ -147,7 +154,12 @@ describe('Checkout API', () => {
     expect(res.status).toBe(409)
 
     await payload.delete({ collection: 'slots', id: slot.id, overrideAccess: true })
-    await payload.delete({ collection: 'products', id: otherProduct.id, overrideAccess: true })
+    await payload.delete({
+      collection: 'products',
+      id: otherProduct.id,
+      overrideAccess: true,
+      context: { disableRevalidate: true },
+    })
   })
 
   it('only allows one of two concurrent requests to reserve the last spot in a slot', async () => {
