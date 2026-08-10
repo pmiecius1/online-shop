@@ -13,6 +13,11 @@ Four bookable service sessions (products), each with a name, description, durati
 
 A visitor picks a product and an available slot on `/products`, checks out via Stripe Checkout, and lands on `/checkout/success`, which shows the product they just bought once Stripe confirms the payment.
 
+## Deployments
+
+- **Production:** https://online-shop-nordleap.vercel.app
+- **Sandbox preview:** https://online-shop-r6k6p61nf-nordleap.vercel.app — deployed by `deploy-preview.yml` on merge into `main`; uses its own separate database, so its product catalog won't match production.
+
 ## How the owner edits content
 
 The owner manages everything from the Payload admin panel at `/admin` (create the first admin user on first run). No code changes or redeploys are needed for day-to-day edits:
