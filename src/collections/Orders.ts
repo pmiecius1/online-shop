@@ -5,10 +5,10 @@ import { authenticated } from '../access/authenticated'
 export const Orders: CollectionConfig = {
   slug: 'orders',
   access: {
-    // Orders are only ever created or marked paid by trusted server code
-    // (the checkout route and the verified Stripe webhook), both of which
-    // use overrideAccess: true. No API caller — including a logged-in
-    // admin via the admin UI — can create or mutate an order directly.
+    // Orders are only ever created by trusted server code (the verified
+    // Stripe webhook), which uses overrideAccess: true. No API caller —
+    // including a logged-in admin via the admin UI — can create or mutate
+    // an order directly.
     create: () => false,
     read: authenticated,
     update: () => false,
@@ -18,7 +18,7 @@ export const Orders: CollectionConfig = {
     useAsTitle: 'stripeCheckoutSessionId',
     defaultColumns: ['product', 'status', 'amount', 'currency', 'createdAt'],
     description:
-      'Orders are created when checkout starts and marked paid only by a verified Stripe webhook event.',
+      'Orders are only ever created by a verified Stripe webhook event once payment is confirmed. No row is written for pending or abandoned checkouts.',
   },
   fields: [
     {
@@ -37,7 +37,11 @@ export const Orders: CollectionConfig = {
       name: 'status',
       type: 'select',
       required: true,
-      defaultValue: 'pending',
+      defaultValue: 'paid',
+      admin: {
+        description:
+          'Always "paid" for webhook-created rows. Other values only exist for records created directly (e.g. in tests).',
+      },
       options: [
         { label: 'Pending', value: 'pending' },
         { label: 'Paid', value: 'paid' },

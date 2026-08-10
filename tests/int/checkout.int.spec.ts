@@ -181,4 +181,27 @@ describe('Checkout API', () => {
     })
     expect(finalSlot.bookedCount).toBe(1)
   })
+
+  it('does not write an Order row when checkout starts (only the webhook does)', async () => {
+    const slot = await payload.create({
+      collection: 'slots',
+      data: {
+        product: productId,
+        startsAt: new Date(Date.now() + 86400000).toISOString(),
+        capacity: 1,
+        bookedCount: 0,
+      },
+      overrideAccess: true,
+    })
+
+    const res = await POST(checkoutRequest({ productId, slotId: slot.id }))
+    expect(res.status).toBe(200)
+
+    const orders = await payload.find({
+      collection: 'orders',
+      where: { product: { equals: productId } },
+      overrideAccess: true,
+    })
+    expect(orders.docs).toHaveLength(0)
+  })
 })
