@@ -35,12 +35,18 @@ describe('Products API', () => {
       collection: 'products',
       data: { ...productData, photo: mediaId },
       overrideAccess: true,
+      context: { disableRevalidate: true },
     })
     productId = product.id
   })
 
   afterAll(async () => {
-    await payload.delete({ collection: 'products', id: productId, overrideAccess: true })
+    await payload.delete({
+      collection: 'products',
+      id: productId,
+      overrideAccess: true,
+      context: { disableRevalidate: true },
+    })
     await payload.delete({ collection: 'media', id: mediaId, overrideAccess: true })
   })
 
@@ -103,6 +109,7 @@ describe('Products API', () => {
       data: { ...productData, name: 'Authenticated Product', photo: mediaId },
       overrideAccess: false,
       user,
+      context: { disableRevalidate: true },
     })
     expect(created.name).toBe('Authenticated Product')
 
@@ -112,6 +119,7 @@ describe('Products API', () => {
       data: { price: 25 },
       overrideAccess: false,
       user,
+      context: { disableRevalidate: true },
     })
     expect(updated.price).toBe(25)
 
@@ -120,6 +128,7 @@ describe('Products API', () => {
       id: created.id,
       overrideAccess: false,
       user,
+      context: { disableRevalidate: true },
     })
   })
 
