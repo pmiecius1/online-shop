@@ -46,4 +46,9 @@ jobs:
         continue-on-error: true
 
       - name: Integration tests
-        run: npm run test:int
+        # --no-file-parallelism: each test file opens its own Payload/DB
+        # connection pool against the transaction pooler; running all 5
+        # files' setup concurrently exhausts it and every beforeAll hook
+        # times out. Confirmed locally: passes reliably serialized, fails
+        # intermittently in parallel.
+        run: npm run test:int -- --no-file-parallelism
