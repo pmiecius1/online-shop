@@ -28,7 +28,9 @@ export async function GET(req: NextRequest): Promise<Response> {
     return new Response('Insufficient search params', { status: 404 })
   }
 
-  if (!path.startsWith('/')) {
+  // `path.startsWith('/')` alone also accepts protocol-relative URLs like
+  // `//evil.com`, which browsers resolve as `https://evil.com` — reject those too.
+  if (!path.startsWith('/') || path.startsWith('//')) {
     return new Response('This endpoint can only be used for relative previews', { status: 500 })
   }
 

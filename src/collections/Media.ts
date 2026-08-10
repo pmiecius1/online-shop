@@ -44,6 +44,11 @@ export const Media: CollectionConfig = {
     staticDir: path.resolve(dirname, '../../public/media'),
     adminThumbnail: 'thumbnail',
     focalPoint: true,
+    // Restricted to raster/standard web image formats. Without this, any
+    // authenticated user could upload arbitrary files (e.g. an SVG with an
+    // embedded <script>) to this publicly-served (read: anyone) store.
+    // Deliberately excludes image/svg+xml, which can carry executable script.
+    mimeTypes: ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/avif'],
     imageSizes: [
       {
         name: 'thumbnail',
