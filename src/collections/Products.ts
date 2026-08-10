@@ -2,6 +2,7 @@ import type { CollectionConfig } from 'payload'
 
 import { anyone } from '../access/anyone'
 import { authenticated } from '../access/authenticated'
+import { revalidateProduct, revalidateProductDelete } from './Products/hooks/revalidateProduct'
 
 export const Products: CollectionConfig = {
   slug: 'products',
@@ -14,6 +15,10 @@ export const Products: CollectionConfig = {
   admin: {
     useAsTitle: 'name',
     defaultColumns: ['name', 'duration', 'price', 'photo'],
+  },
+  hooks: {
+    afterChange: [revalidateProduct],
+    afterDelete: [revalidateProductDelete],
   },
   fields: [
     {
