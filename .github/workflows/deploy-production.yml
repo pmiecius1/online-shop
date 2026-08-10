@@ -2,7 +2,8 @@ name: Deploy Production
 
 # Fires when a pull request into the production branch is merged. Vercel's
 # own Git integration is disconnected (see `vercel git disconnect`), so this
-# is the only thing that deploys to production.
+# is the only thing that deploys to production. The verify-ci job below
+# refuses to deploy unless CI passed on the merged commit.
 on:
   pull_request:
     types: [closed]
@@ -10,7 +11,32 @@ on:
   workflow_dispatch: {}
 
 jobs:
+  verify-ci:
+    # Deploy-production is triggered purely by a PR merge, independent of
+    # whether CI passed on that PR — so a red integration-test run could
+    # otherwise still ship to production. This job blocks that: it looks up
+    # the CI workflow's check-run for the PR's head commit (the commit CI
+    # actually tested) and fails the deploy if CI didn't succeed there.
+    # Skipped for workflow_dispatch, which stays a deliberate manual override.
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require CI to have passed on the merged commit
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          conclusion=$(gh api "repos/${{ github.repository }}/commits/$HEAD_SHA/check-runs" \
+            --jq '[.check_runs[] | select(.name == "test")] | sort_by(.started_at) | last | .conclusion')
+          echo "CI (job: test) conclusion for $HEAD_SHA: ${conclusion:-<no run found>}"
+          if [ "$conclusion" != "success" ]; then
+            echo "::error::CI did not pass for $HEAD_SHA (conclusion: ${conclusion:-none}). Refusing to deploy to production."
+            exit 1
+          fi
+
   deploy-production:
+    needs: verify-ci
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     environment: production
