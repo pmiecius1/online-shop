@@ -14,5 +14,10 @@ export default defineConfig({
     environment: 'node',
     setupFiles: ['./vitest.setup.ts'],
     include: ['tests/int/**/*.int.spec.ts'],
+    // Payload's beforeAll does a full schema pull from Postgres. Locally
+    // (same region as the DB) that's ~5s; from a GitHub Actions runner
+    // (US) against a Supabase project in eu-north-1, cross-region latency
+    // pushes it past the 10s default and every beforeAll hook times out.
+    hookTimeout: 30000,
   },
 })
