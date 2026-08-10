@@ -102,6 +102,7 @@ describe('Stripe webhook', () => {
         photo: mediaId,
       },
       overrideAccess: true,
+      context: { disableRevalidate: true },
     })
     productId = product.id
   })
@@ -117,7 +118,12 @@ describe('Stripe webhook', () => {
       where: { product: { equals: productId } },
       overrideAccess: true,
     })
-    await payload.delete({ collection: 'products', id: productId, overrideAccess: true })
+    await payload.delete({
+      collection: 'products',
+      id: productId,
+      overrideAccess: true,
+      context: { disableRevalidate: true },
+    })
     await payload.delete({ collection: 'media', id: mediaId, overrideAccess: true })
   })
 

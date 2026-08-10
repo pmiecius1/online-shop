@@ -28,20 +28,37 @@ async function markOrderPaid(
     typeof session.payment_intent === 'string' ? session.payment_intent : undefined
   const customerEmail = session.customer_details?.email ?? undefined
 
-  await payload.create({
-    collection: 'orders',
-    data: {
-      product: productId,
-      slot: slotId,
-      status: 'paid',
-      amount: (session.amount_total ?? 0) / 100,
-      currency: session.currency ?? 'eur',
-      stripeCheckoutSessionId: session.id,
-      stripePaymentIntentId: paymentIntentId,
-      customerEmail,
-    },
-    overrideAccess: true,
-  })
+  try {
+    await payload.create({
+      collection: 'orders',
+      data: {
+        product: productId,
+        slot: slotId,
+        status: 'paid',
+        amount: (session.amount_total ?? 0) / 100,
+        currency: session.currency ?? 'eur',
+        stripeCheckoutSessionId: session.id,
+        stripePaymentIntentId: paymentIntentId,
+        customerEmail,
+      },
+      overrideAccess: true,
+    })
+  } catch (err) {
+    // The find-then-create check above isn't atomic — Stripe can and does
+    // deliver overlapping events for the same session (e.g. `completed` and
+    // `async_payment_succeeded` firing close together, or a retried
+    // delivery). The `stripeCheckoutSessionId` unique constraint is the real
+    // guard against a duplicate row; if this create lost that race, the
+    // order already exists and there's nothing left to do.
+    const alreadyExists = await payload.find({
+      collection: 'orders',
+      where: { stripeCheckoutSessionId: { equals: session.id } },
+      limit: 1,
+      overrideAccess: true,
+    })
+    if (alreadyExists.docs[0]) return
+    throw err
+  }
 }
 
 // Payment didn't go through (expired or a delayed payment method failed).

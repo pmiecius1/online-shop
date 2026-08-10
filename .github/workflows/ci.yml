@@ -1,0 +1,43 @@
+name: CI
+
+# Runs lint and the integration test suite (checkout, webhook idempotency,
+# slot-reservation races) on every pull request into main, so a regression
+# has a chance to be caught before deploy-preview.yml/deploy-production.yml
+# ship it. Requires DATABASE_URI/PAYLOAD_SECRET/STRIPE_SECRET_KEY etc. to be
+# configured as repo secrets — see README "Testing" section.
+on:
+  pull_request:
+    branches: [main, production]
+  workflow_dispatch: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URI: ${{ secrets.DATABASE_URI }}
+      PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET }}
+      NEXT_PUBLIC_SERVER_URL: http://localhost:3000
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      PREVIEW_SECRET: ${{ secrets.PREVIEW_SECRET }}
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY }}
+      STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+      BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Integration tests
+        run: pnpm test:int

@@ -2,6 +2,7 @@ import type { CollectionConfig } from 'payload'
 
 import { anyone } from '../access/anyone'
 import { authenticated } from '../access/authenticated'
+import { preventDeleteIfReferenced } from './hooks/preventDeleteIfReferenced'
 import { revalidateProduct, revalidateProductDelete } from './Products/hooks/revalidateProduct'
 
 export const Products: CollectionConfig = {
@@ -18,6 +19,7 @@ export const Products: CollectionConfig = {
   },
   hooks: {
     afterChange: [revalidateProduct],
+    beforeDelete: [preventDeleteIfReferenced({ relationField: 'product', label: 'product' })],
     afterDelete: [revalidateProductDelete],
   },
   fields: [
