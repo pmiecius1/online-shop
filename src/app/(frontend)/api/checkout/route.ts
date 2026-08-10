@@ -84,23 +84,14 @@ export async function POST(request: Request): Promise<Response> {
       },
     })
 
-    await payload.create({
-      collection: 'orders',
-      data: {
-        product: product.id,
-        slot: Number(slotId),
-        status: 'pending',
-        amount: product.price,
-        currency: 'eur',
-        stripeCheckoutSessionId: session.id,
-      },
-      overrideAccess: true,
-    })
-
+    // No Order row is written here. Orders are only ever created by the
+    // Stripe webhook once payment is verified — see markOrderPaid in
+    // /api/webhooks/stripe. This keeps the Orders collection free of
+    // pending/abandoned checkout attempts.
     return Response.json({ url: session.url })
   } catch (err) {
-    // Stripe session creation or the Order write failed after we already
-    // reserved the slot — release the hold so it isn't stuck unavailable.
+    // Stripe session creation failed after we already reserved the slot —
+    // release the hold so it isn't stuck unavailable.
     await releaseSlotHold()
     throw err
   }

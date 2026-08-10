@@ -817,7 +817,7 @@ export interface Slot {
   createdAt: string;
 }
 /**
- * Orders are created when checkout starts and marked paid only by a verified Stripe webhook event.
+ * Orders are only ever created by a verified Stripe webhook event once payment is confirmed. No row is written for pending or abandoned checkouts.
  *
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "orders".
@@ -826,6 +826,9 @@ export interface Order {
   id: number;
   product: number | Product;
   slot: number | Slot;
+  /**
+   * Always "paid" for webhook-created rows. Other values only exist for records created directly (e.g. in tests).
+   */
   status: 'pending' | 'paid' | 'failed' | 'canceled';
   /**
    * Price charged, in the major currency unit (e.g. euros), at time of order.
